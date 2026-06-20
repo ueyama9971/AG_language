@@ -1,5 +1,6 @@
 import argparse
 import os
+import re
 import sys
 import subprocess
 import zipfile
@@ -78,6 +79,17 @@ def find_zip_offset(exe_path, hint_offset=ZIP_START_OFFSET):
     return None, None
 
 
+# Phase 1: Context-aware regex patterns (run FIRST)
+# minified変数名（c, f, a 等）がバージョン更新で変わっても動作する
+UI_REGEX_TRANSLATIONS = [
+    # title: <var> ?? "Workspace Settings"
+    (r'title:\w+\?\?"Workspace Settings"',
+     lambda m: m.group(0).replace('"Workspace Settings"', '"ワークスペース設定"')),
+    # hideBreakdownForGroups: <var> = ["System Prompt"]
+    (r'hideBreakdownForGroups:\w+=\["System Prompt"\]',
+     lambda m: m.group(0).replace('"System Prompt"', '"システムプロンプト"')),
+]
+
 # Translation mappings for the Agent Web UI (main.js)
 UI_TRANSLATIONS = {
     '"Always Ask"': '"常に確認"',
@@ -85,9 +97,6 @@ UI_TRANSLATIONS = {
     '"Always Allow"': '"常に許可"',
     'title:"Token Usage"': 'title:"トークン使用量"',
     '"App Settings"': '"アプリ設定"',
-    'title:c??"Workspace Settings"': 'title:c??"ワークスペース設定"',
-    'hideBreakdownForGroups:f=["System Prompt"]': 'hideBreakdownForGroups:f=["システムプロンプト"]',
-    'hideBreakdownForGroups:a=["System Prompt"]': 'hideBreakdownForGroups:a=["システムプロンプト"]',
     '"System Prompt"': '"システムプロンプト"',
     '"Cancel All Tasks"': '"すべてのタスクをキャンセル"',
     '"Cancel Task"': '"タスクをキャンセル"',
@@ -123,6 +132,16 @@ WIZARD_TRANSLATIONS = {
     "Download the Antigravity IDE": "Antigravity IDE をダウンロードする",
     "Explore the new Antigravity": "新しい Antigravity を使ってみる"
 }
+
+def apply_translations(content):
+    """正規表現パターン → リテラル置換の順で翻訳を適用する。"""
+    # Phase 1: Regex (context-aware, handles minified variable names)
+    for pattern, replacement in UI_REGEX_TRANSLATIONS:
+        content = re.sub(pattern, replacement, content)
+    # Phase 2: Literal
+    for eng, ja in UI_TRANSLATIONS.items():
+        content = content.replace(eng, ja)
+    return content
 
 def parse_args():
     parser = argparse.ArgumentParser(
@@ -298,8 +317,7 @@ def patch_language_server(dry_run=False):
         data = in_zip.read(item.filename)
         if item.filename == 'main.js':
             js_text = data.decode('utf-8')
-            for eng, ja in UI_TRANSLATIONS.items():
-                js_text = js_text.replace(eng, ja)
+            js_text = apply_translations(js_text)
             data = js_text.encode('utf-8')
         out_zip.writestr(item, data)
 
