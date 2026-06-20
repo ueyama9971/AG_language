@@ -6,7 +6,9 @@ import subprocess
 import zipfile
 import io
 import shutil
+import struct
 import time
+import zlib
 
 # Target Paths
 INSTALL_DIR = r"C:\Users\ueyam\AppData\Local\Programs\Antigravity"
@@ -351,32 +353,98 @@ def rollback():
         print(f"Backup not found: {LS_BAK}")
     print("Rollback complete.")
 
+def _add_stored_padding_entry(zip_bytes, padding_size):
+    """ZIP内にストアード型パディングエントリをバイトレベルで追加する（再圧縮なし）。"""
+    eocd_sig = b"PK\x05\x06"
+    eocd_pos = zip_bytes.rfind(eocd_sig)
+    if eocd_pos == -1:
+        raise ValueError("No EOCD found")
+
+    (_sig, _disk, _cd_disk, cd_entries_this, cd_entries_total,
+     cd_size, cd_offset, comment_len) = struct.unpack_from("<IHHHHIIH", zip_bytes, eocd_pos)
+    comment = zip_bytes[eocd_pos + 22:eocd_pos + 22 + comment_len]
+
+    filename = b"__pad__"
+    padding_data = b"\x00" * padding_size
+    crc = zlib.crc32(padding_data) & 0xFFFFFFFF
+
+    local_header = struct.pack("<IHHHHHIIIHH",
+        0x04034b50, 20, 0, 0, 0, 0,
+        crc, padding_size, padding_size,
+        len(filename), 0,
+    ) + filename
+
+    new_local_offset = cd_offset
+
+    cd_entry = struct.pack("<IHHHHHHIIIHHHHHII",
+        0x02014b50, 20, 20, 0, 0, 0, 0,
+        crc, padding_size, padding_size,
+        len(filename), 0, 0, 0, 0, 0,
+        new_local_offset,
+    ) + filename
+
+    new_cd_offset = cd_offset + len(local_header) + padding_size
+    new_cd_size = cd_size + len(cd_entry)
+    new_entries = cd_entries_total + 1
+
+    new_eocd = struct.pack("<IHHHHIIH",
+        0x06054b50, 0, 0,
+        new_entries, new_entries,
+        new_cd_size, new_cd_offset,
+        comment_len,
+    ) + comment
+
+    data_before_cd = zip_bytes[:cd_offset]
+    original_cd = zip_bytes[cd_offset:eocd_pos]
+
+    return bytes(data_before_cd + local_header + padding_data +
+                 original_cd + cd_entry + new_eocd)
+
+
 def pad_zip_to_size(zip_bytes, target_size):
+    """ZIPをtarget_sizeに正確に合わせる。小差はコメント、大差はパディングファイルで対応。"""
+    current_size = len(zip_bytes)
+    if current_size > target_size:
+        raise ValueError(f"Zip too large: {current_size} > {target_size}")
+    if current_size == target_size:
+        return zip_bytes
+
+    diff = target_size - current_size
+
     eocd_sig = b"PK\x05\x06"
     idx = zip_bytes.rfind(eocd_sig)
     if idx == -1:
         raise ValueError("Invalid zip bytes: no EOCD signature found")
-    
-    current_size = len(zip_bytes)
-    if current_size > target_size:
-        raise ValueError(f"Zip too large: current size {current_size} > target size {target_size}. Try compressing more.")
-    
-    diff = target_size - current_size
-    if diff == 0:
-        return zip_bytes
-        
+
     comment_len_offset = idx + 20
     current_comment_len = int.from_bytes(zip_bytes[comment_len_offset:comment_len_offset+2], "little")
-    
-    new_comment_len = current_comment_len + diff
-    if new_comment_len > 65535:
-        raise ValueError(f"Padding difference {diff} too large for zip comment field")
-        
-    new_zip_bytes = bytearray(zip_bytes)
-    new_zip_bytes[comment_len_offset:comment_len_offset+2] = new_comment_len.to_bytes(2, "little")
-    new_zip_bytes.extend(b"\x00" * diff)
-    
-    return bytes(new_zip_bytes)
+
+    if diff <= 65535 - current_comment_len:
+        new_comment_len = current_comment_len + diff
+        new_zip_bytes = bytearray(zip_bytes)
+        new_zip_bytes[comment_len_offset:comment_len_offset+2] = new_comment_len.to_bytes(2, "little")
+        new_zip_bytes.extend(b"\x00" * diff)
+        return bytes(new_zip_bytes)
+
+    # 大差: ストアード型パディングファイルを挿入し、残りをコメントで微調整
+    entry_overhead = 30 + 7 + 46 + 7  # local header + filename + cd entry + filename
+    padding_content = diff - entry_overhead
+    if padding_content < 0:
+        padding_content = 0
+
+    padded = _add_stored_padding_entry(zip_bytes, padding_content)
+    remaining = target_size - len(padded)
+
+    if remaining < 0:
+        padded = _add_stored_padding_entry(zip_bytes, padding_content + remaining)
+        remaining = target_size - len(padded)
+
+    if remaining == 0:
+        return padded
+    if 0 < remaining <= 65535:
+        return pad_zip_to_size(padded, target_size)
+
+    raise ValueError(f"Could not match target size. Current: {len(padded)}, Target: {target_size}")
 
 def patch_asar(temp_dir, dry_run=False):
     if dry_run:
