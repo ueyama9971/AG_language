@@ -401,12 +401,15 @@ def _patch_main_js_inplace(region_data, zip_offset_in_region, zip_size, translat
     struct.pack_into("<I", data, abs_local + 22, new_uncomp)
 
     # セントラルディレクトリのmain.jsエントリも更新
+    # Go embedded ZIPはコンカテネート型: cd_offsetにconcat調整が必要
     eocd_sig = b"PK\x05\x06"
     eocd_pos = zip_data.rfind(eocd_sig)
     (_esig, _edisk, _ecdisk, _eentriesthis, _eentriestotal,
-     cd_size, cd_offset, _ecomment) = struct.unpack_from("<IHHHHIIH", zip_data, eocd_pos)
+     cd_size, cd_offset_raw, comment_len) = struct.unpack_from("<IHHHHIIH", zip_data, eocd_pos)
+    concat = zip_size - cd_offset_raw - cd_size - 22 - comment_len
+    actual_cd_offset = cd_offset_raw + concat
 
-    cd_abs_start = zip_offset_in_region + cd_offset
+    cd_abs_start = zip_offset_in_region + actual_cd_offset
     pos = cd_abs_start
     cd_end = cd_abs_start + cd_size
     while pos < cd_end:
