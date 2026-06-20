@@ -122,7 +122,62 @@ UI_TRANSLATIONS = {
     '"Submit"': '"送信"',
     '"Workspace Command Access"': '"コマンド実行権限"',
     '"Workspace File Access"': '"ファイルアクセス権限"',
-    '"Workspace Web Access"': '"ウェブアクセス権限"'
+    '"Workspace Web Access"': '"ウェブアクセス権限"',
+
+    # --- Conversation Actions ---
+    '"New Conversation"': '"新しい会話"',
+    '"Delete Conversation"': '"会話を削除"',
+    '"Archive Conversation"': '"会話をアーカイブ"',
+
+    # --- Confirmations / Dialogs ---
+    '"Confirm Undo"': '"元に戻す確認"',
+    '"Confirm Browser Interaction"': '"ブラウザ操作の確認"',
+    '"Confirm Window Reload"': '"ウィンドウ再読込の確認"',
+    '"Something went wrong"': '"エラーが発生しました"',
+
+    # --- Feedback ---
+    '"Good response"': '"良い回答"',
+    '"Bad response"': '"悪い回答"',
+    '"Provide Feedback"': '"フィードバックを送る"',
+    '"Provide feedback"': '"フィードバック"',
+    '"Send Feedback"': '"フィードバックを送信"',
+
+    # --- Actions ---
+    '"Try Again"': '"再試行"',
+    '"Reload Window"': '"ウィンドウを再読込"',
+    '"Select Project"': '"プロジェクトを選択"',
+    '"Add Folder"': '"フォルダーを追加"',
+    '"Close Folder"': '"フォルダーを閉じる"',
+    '"Create Project"': '"プロジェクトを作成"',
+    '"Always Proceed"': '"常に続行"',
+    '"Learn more"': '"詳しく見る"',
+    '"Copied"': '"コピーしました"',
+
+    # --- Status ---
+    '"Loading..."': '"読み込み中..."',
+    '"Installing..."': '"インストール中..."',
+    '"Waiting for user input"': '"ユーザー入力を待機中"',
+    '"Background Tasks"': '"バックグラウンドタスク"',
+
+    # --- Settings Sections ---
+    '"Appearance"': '"外観"',
+    '"General"': '"一般"',
+    '"Permissions"': '"権限"',
+    '"Customizations"': '"カスタマイズ"',
+    '"Shortcuts"': '"ショートカット"',
+    '"Account"': '"アカウント"',
+
+    # --- Auth ---
+    '"Sign In"': '"サインイン"',
+    '"Not Signed In"': '"未サインイン"',
+
+    # --- Copy Actions ---
+    '"Copy Path"': '"パスをコピー"',
+    '"Copy File Path"': '"ファイルパスをコピー"',
+    '"Copy File Name"': '"ファイル名をコピー"',
+
+    # --- Code / Search ---
+    '"Code Search"': '"コード検索"',
 }
 
 # Translation mappings for the Electron Shell Wizard (wizardHtml.js)
