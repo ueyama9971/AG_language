@@ -19,6 +19,65 @@ LS_TMP = LS_PATH + ".tmp"
 ZIP_START_OFFSET = 107141712
 ZIP_TARGET_SIZE = 2884187
 
+
+def _validate_and_measure_zip(data):
+    """data が main.js を含む ZIP かを検証し、ZIPサイズを返す。失敗時は None。"""
+    try:
+        eocd_sig = b"PK\x05\x06"
+        eocd_pos = data.rfind(eocd_sig)
+        if eocd_pos == -1:
+            return None
+        comment_len = int.from_bytes(data[eocd_pos + 20:eocd_pos + 22], "little")
+        zip_size = eocd_pos + 22 + comment_len
+        # ZIPサイズ分だけ切り出して検証（末尾にゴミがあるとzipfileが失敗するため）
+        zf = zipfile.ZipFile(io.BytesIO(data[:zip_size]))
+        if "main.js" not in zf.namelist():
+            return None
+        return zip_size
+    except Exception:
+        return None
+
+
+def find_zip_offset(exe_path, hint_offset=ZIP_START_OFFSET):
+    """バイナリ内の埋め込みZIPを自動検出する。既知オフセット→フォールバック走査。"""
+    file_size = os.path.getsize(exe_path)
+
+    with open(exe_path, "rb") as f:
+        # Phase 1: 既知オフセットを試行
+        if hint_offset < file_size:
+            f.seek(hint_offset)
+            sig = f.read(4)
+            if sig == b"PK\x03\x04":
+                f.seek(hint_offset)
+                data = f.read(min(5_000_000, file_size - hint_offset))
+                zip_size = _validate_and_measure_zip(data)
+                if zip_size:
+                    print(f"ZIP found at known offset: {hint_offset} (size: {zip_size})")
+                    return hint_offset, zip_size
+
+        # Phase 2: バイナリ後半を走査
+        print("Known offset mismatch. Scanning binary for embedded ZIP...")
+        scan_size = min(30_000_000, file_size)
+        scan_start = file_size - scan_size
+        f.seek(scan_start)
+        buf = f.read(scan_size)
+
+        idx = 0
+        while idx < len(buf) - 4:
+            idx = buf.find(b"PK\x03\x04", idx)
+            if idx == -1:
+                break
+            candidate = buf[idx:idx + min(5_000_000, len(buf) - idx)]
+            zip_size = _validate_and_measure_zip(candidate)
+            if zip_size:
+                absolute_offset = scan_start + idx
+                print(f"ZIP found by scan at offset: {absolute_offset} (size: {zip_size})")
+                return absolute_offset, zip_size
+            idx += 4
+
+    return None, None
+
+
 # Translation mappings for the Agent Web UI (main.js)
 UI_TRANSLATIONS = {
     '"Always Ask"': '"常に確認"',
@@ -199,39 +258,42 @@ def patch_asar(temp_dir, dry_run=False):
     print("app.asar patched successfully.")
 
 def patch_language_server(dry_run=False):
+    # 1. ZIP自動検出 (before any file modifications)
+    zip_offset, zip_size = find_zip_offset(LS_PATH)
+    if zip_offset is None:
+        print("Error: embedded ZIP not found in language_server.exe")
+        sys.exit(1)
+
     if dry_run:
-        print("[DRY RUN] patch_language_server: スキップ（実際のファイル変更は行いません）")
+        print(f"[DRY RUN] language_server.exe への書き込みをスキップ")
         return
-    # 1. Rename running binary to release the file path lock
+
+    # 2. Rename running binary
     print("Renaming running language_server.exe to language_server.exe.tmp...")
     if os.path.exists(LS_TMP):
         try:
             os.remove(LS_TMP)
         except Exception as e:
             print(f"Warning: Could not remove old tmp file: {e}")
-            
     os.rename(LS_PATH, LS_TMP)
-    
-    # 2. Read base executable data from the renamed tmp file
+
+    # 3. Read base executable from tmp
     print("Reading base executable from tmp file...")
     with open(LS_TMP, "rb") as f:
         exe_data = bytearray(f.read())
-        
-    # Extract embedded zip
-    zip_bytes = exe_data[ZIP_START_OFFSET:ZIP_START_OFFSET + ZIP_TARGET_SIZE]
+
+    zip_bytes = exe_data[zip_offset:zip_offset + zip_size]
     if zip_bytes[:4] != b"PK\x03\x04":
-        print("Error: Invalid ZIP signature at offset. Offset mismatch.")
-        # Restore original before exiting
+        print("Error: Invalid ZIP signature at detected offset.")
         os.rename(LS_TMP, LS_PATH)
         sys.exit(1)
-        
+
+    # 4. Modify web assets
     print("Modifying web assets inside the embedded ZIP...")
     in_zip = zipfile.ZipFile(io.BytesIO(zip_bytes))
     out_bio = io.BytesIO()
-    
-    # Rebuild the ZIP with maximum compression to make sure it remains smaller than target size
     out_zip = zipfile.ZipFile(out_bio, 'w', zipfile.ZIP_DEFLATED, compresslevel=9)
-    
+
     for item in in_zip.infolist():
         data = in_zip.read(item.filename)
         if item.filename == 'main.js':
@@ -239,26 +301,22 @@ def patch_language_server(dry_run=False):
             for eng, ja in UI_TRANSLATIONS.items():
                 js_text = js_text.replace(eng, ja)
             data = js_text.encode('utf-8')
-            
         out_zip.writestr(item, data)
-        
+
     out_zip.close()
     new_zip_bytes = out_bio.getvalue()
-    
+
     print(f"New ZIP size (compressed): {len(new_zip_bytes)} bytes")
-    
-    # Pad to exact target size
-    new_zip_bytes_padded = pad_zip_to_size(new_zip_bytes, ZIP_TARGET_SIZE)
-    print(f"Padded ZIP size: {len(new_zip_bytes_padded)} bytes (Target: {ZIP_TARGET_SIZE})")
-    
-    # Overwrite zip data inside exe
-    exe_data[ZIP_START_OFFSET:ZIP_START_OFFSET + ZIP_TARGET_SIZE] = new_zip_bytes_padded
-    
-    # 3. Write modified data back to the original path (which is now free!)
+
+    new_zip_bytes_padded = pad_zip_to_size(new_zip_bytes, zip_size)
+    print(f"Padded ZIP size: {len(new_zip_bytes_padded)} bytes (Target: {zip_size})")
+
+    exe_data[zip_offset:zip_offset + zip_size] = new_zip_bytes_padded
+
+    # 5. Write back
     print("Writing modified data to language_server.exe...")
     with open(LS_PATH, "wb") as f:
         f.write(exe_data)
-        
     print("language_server.exe patched successfully.")
 
 def main():
