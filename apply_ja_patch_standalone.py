@@ -353,98 +353,79 @@ def rollback():
         print(f"Backup not found: {LS_BAK}")
     print("Rollback complete.")
 
-def _add_stored_padding_entry(zip_bytes, padding_size):
-    """ZIP内にストアード型パディングエントリをバイトレベルで追加する（再圧縮なし）。"""
+def _patch_main_js_inplace(region_data, zip_offset_in_region, zip_size, translated_js_bytes):
+    """ZIP内のmain.jsの圧縮データだけをin-placeで差し替える（他のファイル・Goデータに触れない）。"""
+    data = bytearray(region_data)
+    zip_data = bytes(data[zip_offset_in_region:zip_offset_in_region + zip_size])
+
+    in_zip = zipfile.ZipFile(io.BytesIO(zip_data))
+
+    # main.jsのローカルファイルヘッダーを探す
+    main_info = None
+    for info in in_zip.infolist():
+        if info.filename == "main.js":
+            main_info = info
+            break
+    if main_info is None:
+        raise ValueError("main.js not found in ZIP")
+
+    # ローカルファイルヘッダーを解析してデータオフセットを特定
+    local_header_offset = main_info.header_offset
+    abs_local = zip_offset_in_region + local_header_offset
+    (_sig, _ver, _flags, _method, _time, _date, _crc,
+     comp_size, uncomp_size, fname_len, extra_len
+    ) = struct.unpack_from("<IHHHHHIIIHH", data, abs_local)
+    data_start = abs_local + 30 + fname_len + extra_len
+
+    # 新しい圧縮データを生成
+    co = zlib.compressobj(9, zlib.DEFLATED, -15)
+    new_compressed = co.compress(translated_js_bytes) + co.flush()
+    new_crc = zlib.crc32(translated_js_bytes) & 0xFFFFFFFF
+    new_uncomp = len(translated_js_bytes)
+
+    if len(new_compressed) > comp_size:
+        raise ValueError(
+            f"Recompressed main.js ({len(new_compressed)}) is larger than original ({comp_size}). "
+            "Cannot patch in-place."
+        )
+
+    print(f"  main.js: original compressed={comp_size}, new compressed={len(new_compressed)}, "
+          f"saved={comp_size - len(new_compressed)} bytes")
+
+    # 圧縮データをin-placeで書き込み（余剰バイトはそのまま残る＝ZIPリーダーは無視する）
+    data[data_start:data_start + len(new_compressed)] = new_compressed
+
+    # ローカルファイルヘッダーのCRC・サイズを更新
+    struct.pack_into("<I", data, abs_local + 14, new_crc)
+    struct.pack_into("<I", data, abs_local + 18, len(new_compressed))
+    struct.pack_into("<I", data, abs_local + 22, new_uncomp)
+
+    # セントラルディレクトリのmain.jsエントリも更新
     eocd_sig = b"PK\x05\x06"
-    eocd_pos = zip_bytes.rfind(eocd_sig)
-    if eocd_pos == -1:
-        raise ValueError("No EOCD found")
+    eocd_pos = zip_data.rfind(eocd_sig)
+    (_esig, _edisk, _ecdisk, _eentriesthis, _eentriestotal,
+     cd_size, cd_offset, _ecomment) = struct.unpack_from("<IHHHHIIH", zip_data, eocd_pos)
 
-    (_sig, _disk, _cd_disk, cd_entries_this, cd_entries_total,
-     cd_size, cd_offset, comment_len) = struct.unpack_from("<IHHHHIIH", zip_bytes, eocd_pos)
-    comment = zip_bytes[eocd_pos + 22:eocd_pos + 22 + comment_len]
+    cd_abs_start = zip_offset_in_region + cd_offset
+    pos = cd_abs_start
+    cd_end = cd_abs_start + cd_size
+    while pos < cd_end:
+        sig = struct.unpack_from("<I", data, pos)[0]
+        if sig != 0x02014b50:
+            break
+        cd_fname_len = struct.unpack_from("<H", data, pos + 28)[0]
+        cd_extra_len = struct.unpack_from("<H", data, pos + 30)[0]
+        cd_comment_len = struct.unpack_from("<H", data, pos + 32)[0]
+        cd_fname = data[pos + 46:pos + 46 + cd_fname_len]
+        if cd_fname == b"main.js":
+            struct.pack_into("<I", data, pos + 16, new_crc)
+            struct.pack_into("<I", data, pos + 20, len(new_compressed))
+            struct.pack_into("<I", data, pos + 24, new_uncomp)
+            print("  Central directory entry for main.js updated.")
+            break
+        pos += 46 + cd_fname_len + cd_extra_len + cd_comment_len
 
-    filename = b"__pad__"
-    padding_data = b"\x00" * padding_size
-    crc = zlib.crc32(padding_data) & 0xFFFFFFFF
-
-    local_header = struct.pack("<IHHHHHIIIHH",
-        0x04034b50, 20, 0, 0, 0, 0,
-        crc, padding_size, padding_size,
-        len(filename), 0,
-    ) + filename
-
-    new_local_offset = cd_offset
-
-    cd_entry = struct.pack("<IHHHHHHIIIHHHHHII",
-        0x02014b50, 20, 20, 0, 0, 0, 0,
-        crc, padding_size, padding_size,
-        len(filename), 0, 0, 0, 0, 0,
-        new_local_offset,
-    ) + filename
-
-    new_cd_offset = cd_offset + len(local_header) + padding_size
-    new_cd_size = cd_size + len(cd_entry)
-    new_entries = cd_entries_total + 1
-
-    new_eocd = struct.pack("<IHHHHIIH",
-        0x06054b50, 0, 0,
-        new_entries, new_entries,
-        new_cd_size, new_cd_offset,
-        comment_len,
-    ) + comment
-
-    data_before_cd = zip_bytes[:cd_offset]
-    original_cd = zip_bytes[cd_offset:eocd_pos]
-
-    return bytes(data_before_cd + local_header + padding_data +
-                 original_cd + cd_entry + new_eocd)
-
-
-def pad_zip_to_size(zip_bytes, target_size):
-    """ZIPをtarget_sizeに正確に合わせる。小差はコメント、大差はパディングファイルで対応。"""
-    current_size = len(zip_bytes)
-    if current_size > target_size:
-        raise ValueError(f"Zip too large: {current_size} > {target_size}")
-    if current_size == target_size:
-        return zip_bytes
-
-    diff = target_size - current_size
-
-    eocd_sig = b"PK\x05\x06"
-    idx = zip_bytes.rfind(eocd_sig)
-    if idx == -1:
-        raise ValueError("Invalid zip bytes: no EOCD signature found")
-
-    comment_len_offset = idx + 20
-    current_comment_len = int.from_bytes(zip_bytes[comment_len_offset:comment_len_offset+2], "little")
-
-    if diff <= 65535 - current_comment_len:
-        new_comment_len = current_comment_len + diff
-        new_zip_bytes = bytearray(zip_bytes)
-        new_zip_bytes[comment_len_offset:comment_len_offset+2] = new_comment_len.to_bytes(2, "little")
-        new_zip_bytes.extend(b"\x00" * diff)
-        return bytes(new_zip_bytes)
-
-    # 大差: ストアード型パディングファイルを挿入し、残りをコメントで微調整
-    entry_overhead = 30 + 7 + 46 + 7  # local header + filename + cd entry + filename
-    padding_content = diff - entry_overhead
-    if padding_content < 0:
-        padding_content = 0
-
-    padded = _add_stored_padding_entry(zip_bytes, padding_content)
-    remaining = target_size - len(padded)
-
-    if remaining < 0:
-        padded = _add_stored_padding_entry(zip_bytes, padding_content + remaining)
-        remaining = target_size - len(padded)
-
-    if remaining == 0:
-        return padded
-    if 0 < remaining <= 65535:
-        return pad_zip_to_size(padded, target_size)
-
-    raise ValueError(f"Could not match target size. Current: {len(padded)}, Target: {target_size}")
+    return bytes(data)
 
 def patch_asar(temp_dir, dry_run=False):
     if dry_run:
@@ -474,24 +455,30 @@ def patch_asar(temp_dir, dry_run=False):
     print("app.asar patched successfully.")
 
 def patch_language_server(dry_run=False):
-    # 1. ZIP自動検出 (before any file modifications)
+    # 1. ZIP自動検出
     zip_offset, zip_size = find_zip_offset(LS_PATH)
     if zip_offset is None:
         print("Error: embedded ZIP not found in language_server.exe")
         sys.exit(1)
 
+    # 2. main.js を読み取り・検証
+    with open(LS_PATH, "rb") as f:
+        f.seek(zip_offset)
+        zip_bytes = f.read(zip_size)
+    in_zip = zipfile.ZipFile(io.BytesIO(zip_bytes))
+    js_text = in_zip.read("main.js").decode("utf-8")
+
+    results = validate_translations(js_text)
+    print_validation_report(results)
+
     if dry_run:
-        with open(LS_PATH, "rb") as f:
-            f.seek(zip_offset)
-            zip_bytes = f.read(zip_size)
-        in_zip = zipfile.ZipFile(io.BytesIO(zip_bytes))
-        js_data = in_zip.read("main.js").decode("utf-8")
-        results = validate_translations(js_data)
-        print_validation_report(results)
         print(f"\n[DRY RUN] language_server.exe への書き込みをスキップ")
         return
 
-    # 2. Rename running binary
+    # 3. 翻訳を適用
+    translated = apply_translations(js_text).encode("utf-8")
+
+    # 4. Rename running binary
     print("Renaming running language_server.exe to language_server.exe.tmp...")
     if os.path.exists(LS_TMP):
         try:
@@ -500,44 +487,15 @@ def patch_language_server(dry_run=False):
             print(f"Warning: Could not remove old tmp file: {e}")
     os.rename(LS_PATH, LS_TMP)
 
-    # 3. Read base executable from tmp
+    # 5. in-placeパッチ（main.jsの圧縮データのみ差し替え、Goデータ領域に触れない）
     print("Reading base executable from tmp file...")
     with open(LS_TMP, "rb") as f:
-        exe_data = bytearray(f.read())
+        exe_data = f.read()
 
-    zip_bytes = exe_data[zip_offset:zip_offset + zip_size]
-    if zip_bytes[:4] != b"PK\x03\x04":
-        print("Error: Invalid ZIP signature at detected offset.")
-        os.rename(LS_TMP, LS_PATH)
-        sys.exit(1)
+    print("Patching main.js in-place inside embedded ZIP...")
+    exe_data = _patch_main_js_inplace(exe_data, zip_offset, zip_size, translated)
 
-    # 4. Modify web assets
-    print("Modifying web assets inside the embedded ZIP...")
-    in_zip = zipfile.ZipFile(io.BytesIO(zip_bytes))
-    out_bio = io.BytesIO()
-    out_zip = zipfile.ZipFile(out_bio, 'w', zipfile.ZIP_DEFLATED, compresslevel=9)
-
-    for item in in_zip.infolist():
-        data = in_zip.read(item.filename)
-        if item.filename == 'main.js':
-            js_text = data.decode('utf-8')
-            results = validate_translations(js_text)
-            print_validation_report(results)
-            js_text = apply_translations(js_text)
-            data = js_text.encode('utf-8')
-        out_zip.writestr(item, data)
-
-    out_zip.close()
-    new_zip_bytes = out_bio.getvalue()
-
-    print(f"New ZIP size (compressed): {len(new_zip_bytes)} bytes")
-
-    new_zip_bytes_padded = pad_zip_to_size(new_zip_bytes, zip_size)
-    print(f"Padded ZIP size: {len(new_zip_bytes_padded)} bytes (Target: {zip_size})")
-
-    exe_data[zip_offset:zip_offset + zip_size] = new_zip_bytes_padded
-
-    # 5. Write back
+    # 6. Write back
     print("Writing modified data to language_server.exe...")
     with open(LS_PATH, "wb") as f:
         f.write(exe_data)
