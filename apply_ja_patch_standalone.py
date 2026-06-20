@@ -198,6 +198,55 @@ def apply_translations(content):
         content = content.replace(eng, ja)
     return content
 
+def validate_translations(js_content):
+    """全翻訳パターンのマッチ状況を検証し、結果を返す。"""
+    results = {"matched": [], "missing": [], "regex_matched": [], "regex_missing": []}
+
+    for eng, ja in UI_TRANSLATIONS.items():
+        if eng in js_content:
+            count = js_content.count(eng)
+            results["matched"].append((eng, ja, count))
+        else:
+            results["missing"].append((eng, ja))
+
+    for pattern, replacement in UI_REGEX_TRANSLATIONS:
+        matches = re.findall(pattern, js_content)
+        if matches:
+            results["regex_matched"].append((pattern, len(matches)))
+        else:
+            results["regex_missing"].append((pattern,))
+
+    return results
+
+def print_validation_report(results):
+    """翻訳マッチ検証結果を表示する。"""
+    total_literal = len(results["matched"]) + len(results["missing"])
+    total_regex = len(results["regex_matched"]) + len(results["regex_missing"])
+
+    print(f"\n=== Translation Match Report ===")
+    print(f"Literal: {len(results['matched'])}/{total_literal} matched")
+    print(f"Regex:   {len(results['regex_matched'])}/{total_regex} matched")
+
+    if results["matched"]:
+        print(f"\n  [OK] Literal matches:")
+        for eng, ja, count in results["matched"]:
+            print(f"    {eng} -> {ja} (x{count})")
+
+    if results["regex_matched"]:
+        print(f"\n  [OK] Regex matches:")
+        for pattern, count in results["regex_matched"]:
+            print(f"    /{pattern}/ (x{count})")
+
+    if results["missing"]:
+        print(f"\n  [MISS] Not found (will be skipped):")
+        for eng, ja in results["missing"]:
+            print(f"    {eng}")
+
+    if results["regex_missing"]:
+        print(f"\n  [MISS] Regex not matched:")
+        for (pattern,) in results["regex_missing"]:
+            print(f"    /{pattern}/")
+
 def parse_args():
     parser = argparse.ArgumentParser(
         description="Antigravity 2.0 Standalone 日本語化パッチ"
@@ -212,7 +261,35 @@ def parse_args():
 
 
 def check_patch_status():
-    pass
+    """パッチが適用済みかを確認する。"""
+    print("=== Patch Status Check ===")
+
+    asar_has_backup = os.path.exists(ASAR_BAK)
+    ls_has_backup = os.path.exists(LS_BAK)
+    print(f"app.asar backup:           {'EXISTS' if asar_has_backup else 'NOT FOUND'}")
+    print(f"language_server.exe backup: {'EXISTS' if ls_has_backup else 'NOT FOUND'}")
+
+    zip_offset, zip_size = find_zip_offset(LS_PATH)
+    if zip_offset is None:
+        print("Error: Could not locate embedded ZIP")
+        return
+
+    with open(LS_PATH, "rb") as f:
+        f.seek(zip_offset)
+        zip_bytes = f.read(zip_size)
+
+    in_zip = zipfile.ZipFile(io.BytesIO(zip_bytes))
+    js_text = in_zip.read("main.js").decode("utf-8")
+
+    ja_samples = ['"常に確認"', '"アプリ設定"', '"トークン使用量"', '"エージェント読み込み中..."']
+    ja_found = sum(1 for s in ja_samples if s in js_text)
+
+    if ja_found == len(ja_samples):
+        print(f"Patch status: APPLIED (Japanese strings found: {ja_found}/{len(ja_samples)})")
+    elif ja_found > 0:
+        print(f"Patch status: PARTIALLY APPLIED (Japanese strings found: {ja_found}/{len(ja_samples)})")
+    else:
+        print(f"Patch status: NOT APPLIED (no Japanese strings found)")
 
 
 def terminate_electron_only():
@@ -339,7 +416,14 @@ def patch_language_server(dry_run=False):
         sys.exit(1)
 
     if dry_run:
-        print(f"[DRY RUN] language_server.exe への書き込みをスキップ")
+        with open(LS_PATH, "rb") as f:
+            f.seek(zip_offset)
+            zip_bytes = f.read(zip_size)
+        in_zip = zipfile.ZipFile(io.BytesIO(zip_bytes))
+        js_data = in_zip.read("main.js").decode("utf-8")
+        results = validate_translations(js_data)
+        print_validation_report(results)
+        print(f"\n[DRY RUN] language_server.exe への書き込みをスキップ")
         return
 
     # 2. Rename running binary
@@ -372,6 +456,8 @@ def patch_language_server(dry_run=False):
         data = in_zip.read(item.filename)
         if item.filename == 'main.js':
             js_text = data.decode('utf-8')
+            results = validate_translations(js_text)
+            print_validation_report(results)
             js_text = apply_translations(js_text)
             data = js_text.encode('utf-8')
         out_zip.writestr(item, data)
