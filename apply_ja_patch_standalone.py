@@ -1,3 +1,4 @@
+import argparse
 import os
 import sys
 import subprocess
@@ -63,6 +64,23 @@ WIZARD_TRANSLATIONS = {
     "Download the Antigravity IDE": "Antigravity IDE をダウンロードする",
     "Explore the new Antigravity": "新しい Antigravity を使ってみる"
 }
+
+def parse_args():
+    parser = argparse.ArgumentParser(
+        description="Antigravity 2.0 Standalone 日本語化パッチ"
+    )
+    parser.add_argument("--rollback", action="store_true",
+                        help="バックアップから元の状態に復元する")
+    parser.add_argument("--dry-run", action="store_true",
+                        help="実際の変更を行わず、マッチ結果のみ表示する")
+    parser.add_argument("--check", action="store_true",
+                        help="パッチ適用状態を確認する")
+    return parser.parse_args()
+
+
+def check_patch_status():
+    pass
+
 
 def terminate_electron_only():
     print("Terminating running Antigravity Electron process (standalone app only)...")
@@ -153,7 +171,10 @@ def pad_zip_to_size(zip_bytes, target_size):
     
     return bytes(new_zip_bytes)
 
-def patch_asar(temp_dir):
+def patch_asar(temp_dir, dry_run=False):
+    if dry_run:
+        print("[DRY RUN] patch_asar: スキップ（実際のファイル変更は行いません）")
+        return
     print("Extracting app.asar...")
     subprocess.run(["npx", "asar", "extract", ASAR_PATH, temp_dir], check=True, shell=True)
     
@@ -177,7 +198,10 @@ def patch_asar(temp_dir):
     subprocess.run(["npx", "asar", "pack", temp_dir, ASAR_PATH], check=True, shell=True)
     print("app.asar patched successfully.")
 
-def patch_language_server():
+def patch_language_server(dry_run=False):
+    if dry_run:
+        print("[DRY RUN] patch_language_server: スキップ（実際のファイル変更は行いません）")
+        return
     # 1. Rename running binary to release the file path lock
     print("Renaming running language_server.exe to language_server.exe.tmp...")
     if os.path.exists(LS_TMP):
@@ -238,28 +262,39 @@ def patch_language_server():
     print("language_server.exe patched successfully.")
 
 def main():
-    if len(sys.argv) > 1 and sys.argv[1] == "--rollback":
+    args = parse_args()
+
+    if args.rollback:
         rollback()
         return
-        
+
+    if args.check:
+        check_patch_status()
+        return
+
     print("=== Antigravity 2.0 Standalone Japanese Patch ===")
-    terminate_electron_only()
-    create_backups()
-    
-    # Temp dir for ASAR extraction
+
+    if not args.dry_run:
+        terminate_electron_only()
+        create_backups()
+
     temp_dir = os.path.join(os.path.dirname(__file__), "temp_asar")
     if os.path.exists(temp_dir):
         shutil.rmtree(temp_dir)
-        
+
     try:
-        patch_asar(temp_dir)
-        patch_language_server()
-        print("\nLocalization completed successfully! You can now restart Antigravity.")
-        print("Note: The active agent backend session remains alive. The changes will take effect when the app is restarted.")
+        patch_asar(temp_dir, dry_run=args.dry_run)
+        patch_language_server(dry_run=args.dry_run)
+        if args.dry_run:
+            print("\n[DRY RUN] 上記が適用予定の変更です。実際のファイルは変更されていません。")
+        else:
+            print("\nLocalization completed successfully! You can now restart Antigravity.")
+            print("Note: The active agent backend session remains alive. The changes will take effect when the app is restarted.")
     except Exception as e:
         print(f"\nAn error occurred during patching: {e}")
-        print("Restoring backups...")
-        rollback()
+        if not args.dry_run:
+            print("Restoring backups...")
+            rollback()
     finally:
         if os.path.exists(temp_dir):
             shutil.rmtree(temp_dir)
