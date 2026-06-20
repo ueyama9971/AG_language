@@ -16,8 +16,8 @@ LS_BAK = LS_PATH + ".bak"
 LS_TMP = LS_PATH + ".tmp"
 
 # Zip offset and length inside language_server.exe
-ZIP_START_OFFSET = 107141712
-ZIP_TARGET_SIZE = 2884187
+ZIP_START_OFFSET = 105673492
+ZIP_TARGET_SIZE = 4352407
 
 
 def _validate_and_measure_zip(data):
