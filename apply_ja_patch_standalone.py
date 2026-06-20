@@ -93,7 +93,6 @@ UI_REGEX_TRANSLATIONS = [
 # Translation mappings for the Agent Web UI (main.js)
 UI_TRANSLATIONS = {
     '"Always Ask"': '"常に確認"',
-    '"Always Deny"': '"常に拒否"',
     '"Always Allow"': '"常に許可"',
     'title:"Token Usage"': 'title:"トークン使用量"',
     '"App Settings"': '"アプリ設定"',
@@ -101,11 +100,9 @@ UI_TRANSLATIONS = {
     '"Cancel All Tasks"': '"すべてのタスクをキャンセル"',
     '"Cancel Task"': '"タスクをキャンセル"',
     '"Clear"': '"クリア"',
-    '"Close Settings"': '"設定を閉じる"',
     '"Conversation History"': '"会話履歴"',
     '"Disable Task"': '"タスクを無効化"',
     '"Enable Task"': '"タスクを有効化"',
-    '"Enter a prompt for the agent"': '"エージェントへのプロンプトを入力..."',
     '"Model"': '"モデル"',
     '"Open Settings"': '"設定を開く"',
     '"Project Settings"': '"プロジェクト設定"',
