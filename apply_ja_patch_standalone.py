@@ -10,7 +10,7 @@ import time
 import zlib
 
 # Target Paths
-INSTALL_DIR = r"C:\Users\ueyam\AppData\Local\Programs\Antigravity"
+INSTALL_DIR = os.path.join(os.environ.get("LOCALAPPDATA", ""), "Programs", "Antigravity")
 ASAR_PATH = os.path.join(INSTALL_DIR, "resources", "app.asar")
 ASAR_BAK = ASAR_PATH + ".bak"
 LS_PATH = os.path.join(INSTALL_DIR, "resources", "bin", "language_server.exe")
@@ -88,9 +88,16 @@ WIZARD_TRANSLATIONS = {
     "Explore the new Antigravity": "新しい Antigravity を使ってみる"
 }
 
+def _get_base_dir():
+    """スクリプトまたは PyInstaller .exe のベースディレクトリを返す。"""
+    if getattr(sys, '_MEIPASS', None):
+        return sys._MEIPASS
+    return os.path.dirname(os.path.abspath(__file__))
+
+
 def load_i18n_runtime():
     """i18n_runtime.js を読み込む。"""
-    runtime_path = os.path.join(os.path.dirname(__file__), "i18n_runtime.js")
+    runtime_path = os.path.join(_get_base_dir(), "i18n_runtime.js")
     if not os.path.exists(runtime_path):
         print(f"Error: i18n_runtime.js not found at {runtime_path}")
         sys.exit(1)
@@ -420,6 +427,72 @@ def patch_language_server(dry_run=False):
         f.write(exe_data)
     print("language_server.exe patched successfully.")
 
+def _apply_patch(dry_run=False):
+    """パッチ適用の本体処理。"""
+    print("=== Antigravity 2.0 Standalone Japanese Patch ===")
+
+    if not dry_run:
+        terminate_electron_only()
+        create_backups()
+
+    temp_dir = os.path.join(os.environ.get("TEMP", "."), "ag_temp_asar")
+    if os.path.exists(temp_dir):
+        shutil.rmtree(temp_dir)
+
+    try:
+        patch_asar(temp_dir, dry_run=dry_run)
+        patch_language_server(dry_run=dry_run)
+        if dry_run:
+            print("\n[DRY RUN] 上記が適用予定の変更です。実際のファイルは変更されていません。")
+        else:
+            print("\n日本語化パッチの適用が完了しました！Antigravityを再起動してください。")
+    except Exception as e:
+        print(f"\nパッチ適用中にエラーが発生しました: {e}")
+        if not dry_run:
+            print("バックアップから復元しています...")
+            rollback()
+    finally:
+        if os.path.exists(temp_dir):
+            shutil.rmtree(temp_dir)
+
+
+def _interactive_menu():
+    """ダブルクリック実行時の対話メニュー。"""
+    print("=" * 50)
+    print("  Antigravity 2.0 日本語化パッチ")
+    print("=" * 50)
+    print()
+    print(f"  インストール先: {INSTALL_DIR}")
+    print()
+    print("  1. パッチを適用する（日本語化）")
+    print("  2. パッチを解除する（英語に戻す）")
+    print("  3. パッチ状態を確認する")
+    print("  0. 終了")
+    print()
+
+    while True:
+        choice = input("  番号を入力してください: ").strip()
+        if choice == "1":
+            print()
+            _apply_patch()
+            break
+        elif choice == "2":
+            print()
+            rollback()
+            break
+        elif choice == "3":
+            print()
+            check_patch_status()
+            break
+        elif choice == "0":
+            return
+        else:
+            print("  無効な入力です。1, 2, 3, 0 のいずれかを入力してください。")
+
+    print()
+    input("  Enterキーで終了...")
+
+
 def main():
     args = parse_args()
 
@@ -431,32 +504,13 @@ def main():
         check_patch_status()
         return
 
-    print("=== Antigravity 2.0 Standalone Japanese Patch ===")
+    if args.dry_run:
+        _apply_patch(dry_run=True)
+        return
 
-    if not args.dry_run:
-        terminate_electron_only()
-        create_backups()
+    # 引数なし → インタラクティブメニュー
+    _interactive_menu()
 
-    temp_dir = os.path.join(os.path.dirname(__file__), "temp_asar")
-    if os.path.exists(temp_dir):
-        shutil.rmtree(temp_dir)
-
-    try:
-        patch_asar(temp_dir, dry_run=args.dry_run)
-        patch_language_server(dry_run=args.dry_run)
-        if args.dry_run:
-            print("\n[DRY RUN] 上記が適用予定の変更です。実際のファイルは変更されていません。")
-        else:
-            print("\nLocalization completed successfully! You can now restart Antigravity.")
-            print("Note: The active agent backend session remains alive. The changes will take effect when the app is restarted.")
-    except Exception as e:
-        print(f"\nAn error occurred during patching: {e}")
-        if not args.dry_run:
-            print("Restoring backups...")
-            rollback()
-    finally:
-        if os.path.exists(temp_dir):
-            shutil.rmtree(temp_dir)
 
 if __name__ == "__main__":
     main()
