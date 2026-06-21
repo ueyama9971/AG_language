@@ -1,6 +1,5 @@
 import argparse
 import os
-import re
 import sys
 import subprocess
 import zipfile
@@ -81,104 +80,6 @@ def find_zip_offset(exe_path, hint_offset=ZIP_START_OFFSET):
     return None, None
 
 
-# Phase 1: Context-aware regex patterns (run FIRST)
-# minified変数名（c, f, a 等）がバージョン更新で変わっても動作する
-UI_REGEX_TRANSLATIONS = [
-    # title: <var> ?? "Workspace Settings"
-    (r'title:\w+\?\?"Workspace Settings"',
-     lambda m: m.group(0).replace('"Workspace Settings"', '"ワークスペース設定"')),
-    # hideBreakdownForGroups: <var> = ["System Prompt"]
-    (r'hideBreakdownForGroups:\w+=\["System Prompt"\]',
-     lambda m: m.group(0).replace('"System Prompt"', '"システムプロンプト"')),
-]
-
-# Translation mappings for the Agent Web UI (main.js)
-UI_TRANSLATIONS = {
-    '"Always Ask"': '"常に確認"',
-    '"Always Allow"': '"常に許可"',
-    'title:"Token Usage"': 'title:"トークン使用量"',
-    '"App Settings"': '"アプリ設定"',
-    '"System Prompt"': '"システムプロンプト"',
-    '"Cancel All Tasks"': '"すべてのタスクをキャンセル"',
-    '"Cancel Task"': '"タスクをキャンセル"',
-    '"Clear"': '"クリア"',
-    '"Conversation History"': '"会話履歴"',
-    '"Disable Task"': '"タスクを無効化"',
-    '"Enable Task"': '"タスクを有効化"',
-    '"Model"': '"モデル"',
-    '"Open Settings"': '"設定を開く"',
-    '"Project Settings"': '"プロジェクト設定"',
-    '"Skills are instructions that extend what Agent can do."': '"スキルはエージェントの機能を拡張する指示（インストラクション）です。"',
-    '"Rules"': '"ルール"',
-    '"Skills"': '"スキル"',
-    '"Task Logs"': '"タスクログ"',
-    '"Agent Loading"': '"エージェント読み込み中..."',
-    '"Add Scheduled Task"': '"スケジュールタスクの追加"',
-    '"Background Task"': '"バックグラウンドタスク"',
-    '"Log in to use the agent"': '"エージェントを使用するにはログインしてください"',
-    '"No internet. Agent features may not work."': '"インターネット接続がありません。エージェント機能が動作しない可能性があります。"',
-    '"Stop Task"': '"タスクを停止"',
-    '"Submit"': '"送信"',
-    '"Workspace Command Access"': '"コマンド実行権限"',
-    '"Workspace File Access"': '"ファイルアクセス権限"',
-    '"Workspace Web Access"': '"ウェブアクセス権限"',
-
-    # --- Conversation Actions ---
-    '"New Conversation"': '"新しい会話"',
-    '"Delete Conversation"': '"会話を削除"',
-    '"Archive Conversation"': '"会話をアーカイブ"',
-
-    # --- Confirmations / Dialogs ---
-    '"Confirm Undo"': '"元に戻す確認"',
-    '"Confirm Browser Interaction"': '"ブラウザ操作の確認"',
-    '"Confirm Window Reload"': '"ウィンドウ再読込の確認"',
-    '"Something went wrong"': '"エラーが発生しました"',
-
-    # --- Feedback ---
-    '"Good response"': '"良い回答"',
-    '"Bad response"': '"悪い回答"',
-    '"Provide Feedback"': '"フィードバックを送る"',
-    '"Provide feedback"': '"フィードバック"',
-    '"Send Feedback"': '"フィードバックを送信"',
-
-    # --- Actions ---
-    '"Try Again"': '"再試行"',
-    '"Reload Window"': '"ウィンドウを再読込"',
-    '"Select Project"': '"プロジェクトを選択"',
-    '"Add Folder"': '"フォルダーを追加"',
-    '"Close Folder"': '"フォルダーを閉じる"',
-    '"Create Project"': '"プロジェクトを作成"',
-    '"Always Proceed"': '"常に続行"',
-    '"Learn more"': '"詳しく見る"',
-    '"Copied"': '"コピーしました"',
-
-    # --- Status ---
-    '"Loading..."': '"読み込み中..."',
-    '"Installing..."': '"インストール中..."',
-    '"Waiting for user input"': '"ユーザー入力を待機中"',
-    '"Background Tasks"': '"バックグラウンドタスク"',
-
-    # --- Settings Sections ---
-    '"Appearance"': '"外観"',
-    '"General"': '"一般"',
-    '"Permissions"': '"権限"',
-    '"Customizations"': '"カスタマイズ"',
-    '"Shortcuts"': '"ショートカット"',
-    '"Account"': '"アカウント"',
-
-    # --- Auth ---
-    '"Sign In"': '"サインイン"',
-    '"Not Signed In"': '"未サインイン"',
-
-    # --- Copy Actions ---
-    '"Copy Path"': '"パスをコピー"',
-    '"Copy File Path"': '"ファイルパスをコピー"',
-    '"Copy File Name"': '"ファイル名をコピー"',
-
-    # --- Code / Search ---
-    '"Code Search"': '"コード検索"',
-}
-
 # Translation mappings for the Electron Shell Wizard (wizardHtml.js)
 WIZARD_TRANSLATIONS = {
     "Welcome to the new Antigravity!": "新しい Antigravity へようこそ！",
@@ -187,64 +88,75 @@ WIZARD_TRANSLATIONS = {
     "Explore the new Antigravity": "新しい Antigravity を使ってみる"
 }
 
-def apply_translations(content):
-    """正規表現パターン → リテラル置換の順で翻訳を適用する。"""
-    # Phase 1: Regex (context-aware, handles minified variable names)
-    for pattern, replacement in UI_REGEX_TRANSLATIONS:
-        content = re.sub(pattern, replacement, content)
-    # Phase 2: Literal
-    for eng, ja in UI_TRANSLATIONS.items():
-        content = content.replace(eng, ja)
-    return content
+def load_i18n_runtime():
+    """i18n_runtime.js を読み込む。"""
+    runtime_path = os.path.join(os.path.dirname(__file__), "i18n_runtime.js")
+    if not os.path.exists(runtime_path):
+        print(f"Error: i18n_runtime.js not found at {runtime_path}")
+        sys.exit(1)
+    with open(runtime_path, "r", encoding="utf-8") as f:
+        return f.read()
+
+
+def inject_i18n_runtime(js_content):
+    """main.js 末尾に翻訳ランタイムを追記する。"""
+    runtime = load_i18n_runtime()
+    return js_content + "\n" + runtime
+
+
+def extract_translation_keys():
+    """i18n_runtime.js から翻訳キー（英語文字列）を抽出する。"""
+    import json
+    runtime = load_i18n_runtime()
+    start = runtime.find("var T={")
+    if start == -1:
+        return []
+    start = runtime.find("{", start)
+    depth = 0
+    end = start
+    for i in range(start, len(runtime)):
+        if runtime[i] == "{":
+            depth += 1
+        elif runtime[i] == "}":
+            depth -= 1
+            if depth == 0:
+                end = i + 1
+                break
+    try:
+        table = json.loads(runtime[start:end])
+        return list(table.keys())
+    except json.JSONDecodeError:
+        return []
+
 
 def validate_translations(js_content):
-    """全翻訳パターンのマッチ状況を検証し、結果を返す。"""
-    results = {"matched": [], "missing": [], "regex_matched": [], "regex_missing": []}
-
-    for eng, ja in UI_TRANSLATIONS.items():
-        if eng in js_content:
-            count = js_content.count(eng)
-            results["matched"].append((eng, ja, count))
+    """翻訳キーが main.js 内に存在するか検証する。"""
+    keys = extract_translation_keys()
+    results = {"matched": [], "missing": []}
+    for key in keys:
+        quoted = f'"{key}"'
+        if quoted in js_content:
+            count = js_content.count(quoted)
+            results["matched"].append((key, count))
         else:
-            results["missing"].append((eng, ja))
-
-    for pattern, replacement in UI_REGEX_TRANSLATIONS:
-        matches = re.findall(pattern, js_content)
-        if matches:
-            results["regex_matched"].append((pattern, len(matches)))
-        else:
-            results["regex_missing"].append((pattern,))
-
+            results["missing"].append(key)
     return results
 
+
 def print_validation_report(results):
-    """翻訳マッチ検証結果を表示する。"""
-    total_literal = len(results["matched"]) + len(results["missing"])
-    total_regex = len(results["regex_matched"]) + len(results["regex_missing"])
-
-    print(f"\n=== Translation Match Report ===")
-    print(f"Literal: {len(results['matched'])}/{total_literal} matched")
-    print(f"Regex:   {len(results['regex_matched'])}/{total_regex} matched")
-
+    """翻訳キー検証結果を表示する。"""
+    total = len(results["matched"]) + len(results["missing"])
+    print(f"\n=== Translation Key Report ===")
+    print(f"Keys found: {len(results['matched'])}/{total}")
     if results["matched"]:
-        print(f"\n  [OK] Literal matches:")
-        for eng, ja, count in results["matched"]:
-            print(f"    {eng} -> {ja} (x{count})")
-
-    if results["regex_matched"]:
-        print(f"\n  [OK] Regex matches:")
-        for pattern, count in results["regex_matched"]:
-            print(f"    /{pattern}/ (x{count})")
-
+        print(f"\n  [OK] Found in main.js:")
+        for key, count in results["matched"]:
+            print(f'    "{key}" (x{count})')
     if results["missing"]:
-        print(f"\n  [MISS] Not found (will be skipped):")
-        for eng, ja in results["missing"]:
-            print(f"    {eng}")
+        print(f"\n  [MISS] Not found:")
+        for key in results["missing"]:
+            print(f'    "{key}"')
 
-    if results["regex_missing"]:
-        print(f"\n  [MISS] Regex not matched:")
-        for (pattern,) in results["regex_missing"]:
-            print(f"    /{pattern}/")
 
 def parse_args():
     parser = argparse.ArgumentParser(
@@ -280,15 +192,10 @@ def check_patch_status():
     in_zip = zipfile.ZipFile(io.BytesIO(zip_bytes))
     js_text = in_zip.read("main.js").decode("utf-8")
 
-    ja_samples = ['"常に確認"', '"アプリ設定"', '"トークン使用量"', '"エージェント読み込み中..."']
-    ja_found = sum(1 for s in ja_samples if s in js_text)
-
-    if ja_found == len(ja_samples):
-        print(f"Patch status: APPLIED (Japanese strings found: {ja_found}/{len(ja_samples)})")
-    elif ja_found > 0:
-        print(f"Patch status: PARTIALLY APPLIED (Japanese strings found: {ja_found}/{len(ja_samples)})")
+    if "ag_i18n_runtime" in js_text:
+        print("Patch status: APPLIED (i18n runtime found)")
     else:
-        print(f"Patch status: NOT APPLIED (no Japanese strings found)")
+        print("Patch status: NOT APPLIED (i18n runtime not found)")
 
 
 def terminate_electron_only():
@@ -353,7 +260,7 @@ def rollback():
         print(f"Backup not found: {LS_BAK}")
     print("Rollback complete.")
 
-def _patch_main_js_inplace(region_data, zip_offset_in_region, zip_size, translated_js_bytes):
+def _patch_main_js_inplace(region_data, zip_offset_in_region, zip_size, js_content_bytes):
     """ZIP内のmain.jsの圧縮データだけをin-placeで差し替える（他のファイル・Goデータに触れない）。"""
     data = bytearray(region_data)
     zip_data = bytes(data[zip_offset_in_region:zip_offset_in_region + zip_size])
@@ -379,9 +286,9 @@ def _patch_main_js_inplace(region_data, zip_offset_in_region, zip_size, translat
 
     # 新しい圧縮データを生成
     co = zlib.compressobj(9, zlib.DEFLATED, -15)
-    new_compressed = co.compress(translated_js_bytes) + co.flush()
-    new_crc = zlib.crc32(translated_js_bytes) & 0xFFFFFFFF
-    new_uncomp = len(translated_js_bytes)
+    new_compressed = co.compress(js_content_bytes) + co.flush()
+    new_crc = zlib.crc32(js_content_bytes) & 0xFFFFFFFF
+    new_uncomp = len(js_content_bytes)
 
     if len(new_compressed) > comp_size:
         raise ValueError(
@@ -458,13 +365,11 @@ def patch_asar(temp_dir, dry_run=False):
     print("app.asar patched successfully.")
 
 def patch_language_server(dry_run=False):
-    # 1. ZIP自動検出
     zip_offset, zip_size = find_zip_offset(LS_PATH)
     if zip_offset is None:
         print("Error: embedded ZIP not found in language_server.exe")
         sys.exit(1)
 
-    # 2. main.js を読み取り・検証
     with open(LS_PATH, "rb") as f:
         f.seek(zip_offset)
         zip_bytes = f.read(zip_size)
@@ -475,13 +380,26 @@ def patch_language_server(dry_run=False):
     print_validation_report(results)
 
     if dry_run:
+        injected = inject_i18n_runtime(js_text)
+        injected_bytes = injected.encode("utf-8")
+        co = zlib.compressobj(9, zlib.DEFLATED, -15)
+        test_compressed = co.compress(injected_bytes) + co.flush()
+        for info in in_zip.infolist():
+            if info.filename == "main.js":
+                orig_comp = info.compress_size
+                break
+        diff = orig_comp - len(test_compressed)
+        print(f"\n  Size: original compressed={orig_comp}, new={len(test_compressed)}, margin={diff} bytes")
+        if diff < 0:
+            print("  WARNING: New compressed size exceeds original! Patch will fail.")
+        else:
+            print("  OK: Fits within original size.")
         print(f"\n[DRY RUN] language_server.exe への書き込みをスキップ")
         return
 
-    # 3. 翻訳を適用
-    translated = apply_translations(js_text).encode("utf-8")
+    injected = inject_i18n_runtime(js_text)
+    translated_bytes = injected.encode("utf-8")
 
-    # 4. Rename running binary
     print("Renaming running language_server.exe to language_server.exe.tmp...")
     if os.path.exists(LS_TMP):
         try:
@@ -490,15 +408,13 @@ def patch_language_server(dry_run=False):
             print(f"Warning: Could not remove old tmp file: {e}")
     os.rename(LS_PATH, LS_TMP)
 
-    # 5. in-placeパッチ（main.jsの圧縮データのみ差し替え、Goデータ領域に触れない）
     print("Reading base executable from tmp file...")
     with open(LS_TMP, "rb") as f:
         exe_data = f.read()
 
-    print("Patching main.js in-place inside embedded ZIP...")
-    exe_data = _patch_main_js_inplace(exe_data, zip_offset, zip_size, translated)
+    print("Injecting i18n runtime into main.js in-place...")
+    exe_data = _patch_main_js_inplace(exe_data, zip_offset, zip_size, translated_bytes)
 
-    # 6. Write back
     print("Writing modified data to language_server.exe...")
     with open(LS_PATH, "wb") as f:
         f.write(exe_data)
