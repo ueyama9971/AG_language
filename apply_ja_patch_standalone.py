@@ -346,27 +346,30 @@ def _patch_main_js_inplace(region_data, zip_offset_in_region, zip_size, js_conte
 
 def patch_asar(temp_dir, dry_run=False):
     if dry_run:
-        print("[DRY RUN] patch_asar: スキップ（実際のファイル変更は行いません）")
+        print("[DRY RUN] patch_asar: スキップ")
+        return
+    if shutil.which("npx") is None:
+        print("npx が見つかりません。ウィザード画面のパッチをスキップします（メイン機能に影響なし）。")
         return
     print("Extracting app.asar...")
     subprocess.run(["npx", "asar", "extract", ASAR_PATH, temp_dir], check=True, shell=True)
-    
+
     wizard_file = os.path.join(temp_dir, "dist", "ideInstall", "wizardHtml.js")
     if os.path.exists(wizard_file):
         print(f"Patching {wizard_file}...")
         with open(wizard_file, "r", encoding="utf-8") as f:
             content = f.read()
-            
+
         for eng, ja in WIZARD_TRANSLATIONS.items():
             content = content.replace(eng, ja)
-            
+
         with open(wizard_file, "w", encoding="utf-8") as f:
             f.write(content)
-            
+
         print("Wizard HTML patched.")
     else:
         print("Warning: wizardHtml.js not found in ASAR.")
-        
+
     print("Repackaging app.asar...")
     subprocess.run(["npx", "asar", "pack", temp_dir, ASAR_PATH], check=True, shell=True)
     print("app.asar patched successfully.")
