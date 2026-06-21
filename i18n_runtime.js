@@ -274,7 +274,29 @@ var T={
 "Toggle Auxiliary Pane":"補助パネルの切替",
 "Zoom In":"拡大",
 "Zoom Out":"縮小",
-"Reset Zoom":"ズームをリセット"
+"Reset Zoom":"ズームをリセット",
+"CONVERSATION":"会話",
+"Toggle Model Selector":"モデル選択の切替",
+"Toggle Voice Recording":"音声録音の切替",
+"Find in Pane":"パネル内検索",
+"Agent Settings":"エージェント設定",
+"Security Preset":"セキュリティプリセット",
+"Choose a predefined security preset for the agent. This controls terminal auto-execution policy, and file access policy.":"エージェントの定義済みセキュリティプリセットを選択します。ターミナルの自動実行ポリシーとファイルアクセスポリシーを制御します。",
+"Default":"デフォルト",
+"Requires manual review for all terminal commands and file accesses outside of the working folders.":"作業フォルダー外のすべてのターミナルコマンドとファイルアクセスに手動レビューが必要です。",
+"Full machine":"フルマシン",
+"All terminal commands require review. The agent can read or write to any file in the machine.":"すべてのターミナルコマンドにレビューが必要です。エージェントはマシン上の任意のファイルを読み書きできます。",
+"Turbo mode":"ターボモード",
+"Disables all safety barriers for maximal iteration velocity.":"最大の反復速度のためにすべての安全バリアを無効にします。",
+"Custom":"カスタム",
+"Manually customize individual settings.":"個別の設定を手動でカスタマイズします。",
+"Agent Behavior":"エージェントの動作",
+"Artifact Review Policy":"アーティファクトレビューポリシー",
+"Specifies Agent's behavior when asking for review on artifacts, which are documents it creates to enable a richer conversation experience.":"アーティファクト（より豊かな会話体験のために作成されるドキュメント）のレビュー時のエージェントの動作を指定します。",
+"Local Permissions":"ローカル権限",
+"Local permissions have higher priority.":"ローカル権限が優先されます。",
+"Danger Zone":"危険ゾーン",
+"Delete Project":"プロジェクトを削除"
 };
 var L=localStorage.getItem("ag_lang")||"en";
 function trNode(n){
