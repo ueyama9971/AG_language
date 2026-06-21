@@ -89,9 +89,9 @@ function init(){
 if(L==="ja")setTimeout(trAll,200);
 var d=document.createElement("div");
 d.id="ag-i18n";
-d.style.cssText="position:fixed;top:6px;right:52px;z-index:9999;display:flex;align-items:center;gap:4px";
-d.innerHTML='<span style="color:#888;font-size:11px">\u{1F310}</span>'
-+'<select id="ag-lang-sel" style="background:var(--bg-base,#1e1e2e);color:var(--text-normal,#cdd6f4);border:1px solid var(--border-color,#45475a);border-radius:4px;padding:1px 4px;font-size:11px;cursor:pointer;outline:none">'
+d.style.cssText="position:fixed;bottom:12px;left:100px;z-index:99999;display:flex;align-items:center;gap:6px;background:rgba(30,30,46,0.95);border:1px solid #45475a;border-radius:8px;padding:4px 10px;box-shadow:0 2px 8px rgba(0,0,0,0.3)";
+d.innerHTML='<span style="font-size:14px">\u{1F310}</span>'
++'<select id="ag-lang-sel" style="background:transparent;color:#cdd6f4;border:none;font-size:12px;cursor:pointer;outline:none">'
 +'<option value="en">English</option><option value="ja">日本語</option></select>';
 document.body.appendChild(d);
 var sel=document.getElementById("ag-lang-sel");
