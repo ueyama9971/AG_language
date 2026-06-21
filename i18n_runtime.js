@@ -217,7 +217,20 @@ var T={
 "Request Review":"レビューを要求",
 "Actuation Permissions":"操作権限",
 "Browser Actuation Rules":"ブラウザ操作ルール",
-"Configure allowed and denied URLs for browser actuation.":"ブラウザ操作用の許可・拒否URLを設定します。"
+"Configure allowed and denied URLs for browser actuation.":"ブラウザ操作用の許可・拒否URLを設定します。",
+"File Reads":"ファイル読み取り",
+"Allow/deny agent read access to specific files or directories.":"特定のファイルやディレクトリへのエージェントの読み取りアクセスを許可・拒否します。",
+"File Writes":"ファイル書き込み",
+"Allow/deny agent write access to specific files or directories.":"特定のファイルやディレクトリへのエージェントの書き込みアクセスを許可・拒否します。",
+"Allow":"許可",
+"Deny":"拒否",
+"Add":"追加",
+"Read URLs":"URL読み取り",
+"Allow/deny agent read access to specific URLs or domains.":"特定のURLやドメインへのエージェントの読み取りアクセスを許可・拒否します。",
+"Allow/deny specific terminal commands.":"特定のターミナルコマンドを許可・拒否します。",
+"Allow/deny agent command execution outside the sandbox.":"サンドボックス外でのエージェントのコマンド実行を許可・拒否します。",
+"External tools the agent can call via Model Context Protocol.":"エージェントがModel Context Protocol経由で呼び出せる外部ツール。",
+"Back":"戻る"
 };
 var L=localStorage.getItem("ag_lang")||"en";
 function trNode(n){
