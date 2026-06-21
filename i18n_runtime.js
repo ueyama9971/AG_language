@@ -240,7 +240,18 @@ var T={
 "Within each group, models share a weekly limit and a 5-hour limit. Quota is consumed proportionally to the cost of the tokens. Thus, limits will last longer with shorter tasks or using more cost-effective models. The 5-hour limit smooths out aggregate demand to fairly distribute global capacity across all users, while your weekly limit is tied directly to your individual tier.":"各グループ内のモデルは週間リミットと5時間リミットを共有します。クォータはトークンのコストに比例して消費されます。短いタスクやコスト効率の良いモデルを使うとリミットが長持ちします。5時間リミットは全ユーザー間でグローバル容量を公平に分配するためのもので、週間リミットは個人のティアに直接紐づいています。",
 "Configure default behaviors, skills, and MCP servers.":"デフォルトの動作、スキル、MCPサーバーを設定します。",
 "The breakdown below shows token usage from customizations like skills, rules, and MCP. If the budget is exceeded, large customizations will be truncated automatically.":"以下の内訳はスキル、ルール、MCPなどのカスタマイズによるトークン使用量です。予算を超過した場合、大きなカスタマイズは自動的に切り詰められます。",
-"Show 2 breakdowns":"2つの内訳を表示"
+"Show 2 breakdowns":"2つの内訳を表示",
+"Configure the browser subagent. It requires":"ブラウザサブエージェントを設定します。",
+"to be installed. The browser subagent can be invoked by typing /browser in the conversation input box.":"が必要です。ブラウザサブエージェントは会話入力欄で /browser と入力して呼び出せます。",
+"Manage application settings.":"アプリケーション設定を管理します。",
+"Prevent Sleep":"スリープ防止",
+"Prevent the computer from sleeping while the app is running.":"アプリ実行中にコンピューターのスリープを防止します。",
+"Keep In Menu Bar":"メニューバーに常駐",
+"The app will be accessible from the menu bar and will keep running in the background when all windows are closed.":"すべてのウィンドウを閉じてもメニューバーからアクセスでき、バックグラウンドで実行し続けます。",
+"Notifications":"通知",
+"Notification Settings":"通知設定",
+"To modify notification settings, open your operating system's system preferences.":"通知設定を変更するには、OSのシステム設定を開いてください。",
+"Open System Preferences":"システム設定を開く"
 };
 var L=localStorage.getItem("ag_lang")||"en";
 function trNode(n){
