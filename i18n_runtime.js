@@ -251,7 +251,30 @@ var T={
 "Notifications":"通知",
 "Notification Settings":"通知設定",
 "To modify notification settings, open your operating system's system preferences.":"通知設定を変更するには、OSのシステム設定を開いてください。",
-"Open System Preferences":"システム設定を開く"
+"Open System Preferences":"システム設定を開く",
+"Block all browser JavaScript execution.":"ブラウザのJavaScript実行をすべてブロックします。",
+"Prompt for approval before running browser scripts.":"ブラウザスクリプト実行前に承認を求めます。",
+"Allow full browser script execution without prompting.":"確認なしでブラウザスクリプトの完全実行を許可します。",
+"Browser Actuation Permissions":"ブラウザ操作権限",
+"Execute URLs":"URL実行",
+"Allow/deny agent browser actuation access to specific URLs.":"特定のURLへのエージェントのブラウザ操作アクセスを許可・拒否します。",
+"Keyboard shortcuts for quick navigation and control.":"クイックナビゲーションと操作のためのキーボードショートカット。",
+"RECOMMENDED":"おすすめ",
+"NAVIGATION":"ナビゲーション",
+"LAYOUT CONTROLS":"レイアウト操作",
+"Open Conversation Picker":"会話ピッカーを開く",
+"Open File Search":"ファイル検索を開く",
+"Focus Input":"入力欄にフォーカス",
+"Go Back":"戻る",
+"Go Forward":"進む",
+"File Picker":"ファイルピッカー",
+"Select Previous Conversation":"前の会話を選択",
+"Select Next Conversation":"次の会話を選択",
+"Toggle Sidebar":"サイドバーの切替",
+"Toggle Auxiliary Pane":"補助パネルの切替",
+"Zoom In":"拡大",
+"Zoom Out":"縮小",
+"Reset Zoom":"ズームをリセット"
 };
 var L=localStorage.getItem("ag_lang")||"en";
 function trNode(n){
