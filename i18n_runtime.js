@@ -296,7 +296,14 @@ var T={
 "Local Permissions":"ローカル権限",
 "Local permissions have higher priority.":"ローカル権限が優先されます。",
 "Danger Zone":"危険ゾーン",
-"Delete Project":"プロジェクトを削除"
+"Delete Project":"プロジェクトを削除",
+"Outside of folders file access policy":"フォルダー外ファイルアクセスポリシー",
+"Configures how the agent tries to access files outside of its working folders.":"エージェントが作業フォルダー外のファイルにアクセスする方法を設定します。",
+"Terminal Command Auto Execution":"ターミナルコマンド自動実行",
+"Controls whether terminal commands require your approval before running.":"ターミナルコマンドの実行前に承認が必要かどうかを制御します。",
+"Require Review":"レビューを要求",
+"Manage project folders, agent settings, and permissions.":"プロジェクトフォルダー、エージェント設定、権限を管理します。",
+"of the customization budget is available.":"のカスタマイズ予算が利用可能です。"
 };
 var L=localStorage.getItem("ag_lang")||"en";
 function trNode(n){
