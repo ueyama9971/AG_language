@@ -230,7 +230,17 @@ var T={
 "Allow/deny specific terminal commands.":"特定のターミナルコマンドを許可・拒否します。",
 "Allow/deny agent command execution outside the sandbox.":"サンドボックス外でのエージェントのコマンド実行を許可・拒否します。",
 "External tools the agent can call via Model Context Protocol.":"エージェントがModel Context Protocol経由で呼び出せる外部ツール。",
-"Back":"戻る"
+"Back":"戻る",
+"allow":"許可",
+"ask":"確認",
+"deny":"拒否",
+"Your Plan: Google AI Pro":"プラン: Google AI Pro",
+"You can upgrade to a Google AI Ultra plan to receive higher rate limits.":"Google AI Ultraプランにアップグレードすると、より高いレート制限を受けられます。",
+"When toggled on, Antigravity will use your AI credits to fulfill model requests once you're out of model quota. Antigravity will always use your model quota first before using AI credits.":"有効にすると、モデルクォータを使い切った際にAIクレジットを使用してリクエストを処理します。Antigravityは常にAIクレジットより先にモデルクォータを使用します。",
+"Within each group, models share a weekly limit and a 5-hour limit. Quota is consumed proportionally to the cost of the tokens. Thus, limits will last longer with shorter tasks or using more cost-effective models. The 5-hour limit smooths out aggregate demand to fairly distribute global capacity across all users, while your weekly limit is tied directly to your individual tier.":"各グループ内のモデルは週間リミットと5時間リミットを共有します。クォータはトークンのコストに比例して消費されます。短いタスクやコスト効率の良いモデルを使うとリミットが長持ちします。5時間リミットは全ユーザー間でグローバル容量を公平に分配するためのもので、週間リミットは個人のティアに直接紐づいています。",
+"Configure default behaviors, skills, and MCP servers.":"デフォルトの動作、スキル、MCPサーバーを設定します。",
+"The breakdown below shows token usage from customizations like skills, rules, and MCP. If the budget is exceeded, large customizations will be truncated automatically.":"以下の内訳はスキル、ルール、MCPなどのカスタマイズによるトークン使用量です。予算を超過した場合、大きなカスタマイズは自動的に切り詰められます。",
+"Show 2 breakdowns":"2つの内訳を表示"
 };
 var L=localStorage.getItem("ag_lang")||"en";
 function trNode(n){
