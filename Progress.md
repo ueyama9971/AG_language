@@ -7,7 +7,7 @@
 | 案件 | Antigravity 日本語化パッチ |
 | 状態 | ⏸ 休止 |
 | 手番 | |
-| 残り | 統合ブランチが無い（枝は `feature/standalone-patch-enhancement` 1 本で、それが GitHub の default。再開でも撤収でもリネームが先）／翻訳カバレッジの拡大（圧縮 margin 3.6KB 残り）／`--dry-run` の margin 比較をバックアップ基準へ改善／IDE 版パッチ（`apply_ja_patch_ide.py`）の同等改善 |
+| 残り | 翻訳カバレッジの拡大（圧縮 margin 3.6KB 残り）／`--dry-run` の margin 比較をバックアップ基準へ改善／IDE 版パッチ（`apply_ja_patch_ide.py`）の同等改善 |
 | 次の一手 | 再開するか畳むか判断する。2026-06-21 から停止しており、残りは任意の改善のみ |
 | 詰まり | |
 | 更新 | 2026-08-04 |
